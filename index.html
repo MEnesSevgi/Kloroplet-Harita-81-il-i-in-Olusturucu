@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <title>Kloroplet Harita(81 il için) Oluşturucu</title>
+    
+
+  </head>
+    
+  <body>
+  <!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Türkiye & Dünya Korolet Haritası - Dinamik Lejantlı</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; display: flex; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { flex-grow: 1; height: 100%; background: #f4f4f4; }
+
+        #dataPanel {
+            width: 380px; background: #fff; padding: 20px;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1); overflow-y: auto; z-index: 1001;
+        }
+        
+        body.view-mode #dataPanel { display: none; }
+
+        .control-group { border: 1px solid #eee; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #fafafa; }
+        .province-entry { display: flex; align-items: center; margin-bottom: 8px; }
+        .province-entry label { flex: 1; font-size: 0.85em; }
+        .province-entry input { width: 80px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }
+
+        .range-entry { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; }
+        .range-entry input { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }
+
+        .city-label {
+            font-size: 10px; font-weight: bold; color: #333;
+            text-shadow: 0 0 3px #fff; text-align: center;
+            pointer-events: none !important; white-space: nowrap;
+        }
+
+        .btn { width: 100%; padding: 10px; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 10px; font-weight: bold; transition: 0.3s; }
+        .btn-update { background: #28a745; color: white; }
+        .btn-share { background: #6f42c1; color: white; }
+        .btn-download { background: #ffc107; color: #333; }
+        .btn-upload { background: #17a2b8; color: white; }
+
+        .color-option { display: inline-block; width: 25px; height: 25px; margin: 2px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+        .color-option.selected { border-color: #333; }
+
+        /* Lejant Stili */
+        .info.legend {
+            padding: 10px; background: white; background: rgba(255,255,255,0.9);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2); border-radius: 5px; line-height: 24px; color: #555;
+        }
+        .info.legend i { width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.7; border: 1px solid #999; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="dataPanel">
+    <h2>📊 Harita Yönetimi</h2>
+    
+    <div class="control-group">
+        <button id="shareMap" class="btn btn-share">🔗 Haritayı Paylaş (Görünüm Linki)</button>
+    </div>
+
+    <div class="control-group">
+        <p>🎨 <b>Renk Aralıkları & Palet</b></p>
+        <div id="rangeInputs">
+            <div class="range-entry"><input type="number" class="range-val" value="10" placeholder="Sınır 1"></div>
+            <div class="range-entry"><input type="number" class="range-val" value="50" placeholder="Sınır 2"></div>
+            <div class="range-entry"><input type="number" class="range-val" value="100" placeholder="Sınır 3"></div>
+            <div class="range-entry"><input type="number" class="range-val" value="500" placeholder="Sınır 4"></div>
+            <div class="range-entry"><input type="number" class="range-val" value="1000" placeholder="Sınır 5"></div>
+        </div>
+        <div id="colorPaletteSelector" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="control-group">
+        <p>📁 <b>Excel Veri Yönetimi</b></p>
+        <button id="downloadTemplate" class="btn btn-download">1. Şablon İndir</button>
+        <button id="uploadData" class="btn btn-upload">2. Veri Yükle (.xlsx)</button>
+        <input type="file" id="excelFile" accept=".xlsx, .xls" style="display: none;">
+    </div>
+
+    <h3>📍 İl Verileri</h3>
+    <div id="provinceInputs"></div>
+    <button id="updateButton" class="btn btn-update">Haritayı Güncelle</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+    const map = L.map('map').setView([39, 35], 6);
+    let currentData = {};
+    let selectedPaletteKey = 'blue';
+    let userRanges = [10, 50, 100, 500, 1000];
+    let legendControl;
+
+    const PALETTES = {
+        blue: ['#deebf7','#c6dbef','#9ecae1','#6baed6','#4292c6','#2171b5','#084594'],
+        red: ['#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#99000d'],
+        green: ['#e5f5e0','#c7e9c0','#a1d99b','#74c476','#41ab5d','#238b45','#005a32']
+    };
+
+    // Katmanlar
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' });
+    const worldLayer = L.layerGroup();
+    const turkeyLayerGroup = L.layerGroup().addTo(map);
+
+    L.control.layers(
+        { "Sadece Harita": L.tileLayer('') },
+        { "OpenStreetMap": osmLayer, "Türkiye İller": turkeyLayerGroup, "Dünya Sınırları": worldLayer }
+    ).addTo(map);
+    osmLayer.addTo(map);
+
+    // Dünya Sınırlarını Yükle
+    fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+        .then(r => r.json()).then(data => {
+            L.geoJSON(data, { style: { color: "#999", weight: 0.5, fillOpacity: 0.1, interactive: false } }).addTo(worldLayer);
+        });
+
+    function normalizeName(str) {
+        if (!str) return "";
+        return str.toString().toLowerCase().trim()
+            .replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s")
+            .replace(/ı/g, "i").replace(/ö/g, "o").replace(/ç/g, "c")
+            .replace(/\s+/g, "");
+    }
+
+    function getColor(d) {
+        const palette = PALETTES[selectedPaletteKey];
+        if (d === 0 || d === null || d === undefined) return '#f1f1f1';
+        for (let i = 0; i < userRanges.length; i++) {
+            if (d <= userRanges[i]) return palette[i] || palette[palette.length-1];
+        }
+        return palette[palette.length - 1];
+    }
+
+    function styleFeature(feature) {
+        const name = feature.properties.NAME || feature.properties.name || "";
+        const val = currentData[normalizeName(name)] || 0;
+        return { fillColor: getColor(val), weight: 1.5, opacity: 1, color: '#666', fillOpacity: 0.8 };
+    }
+
+    function updateLegend() {
+        if (legendControl) map.removeControl(legendControl);
+        legendControl = L.control({ position: 'bottomright' });
+        legendControl.onAdd = function () {
+            const div = L.DomUtil.create('div', 'info legend');
+            const palette = PALETTES[selectedPaletteKey];
+            let labels = ['<i style="background:#f1f1f1"></i> 0'];
+            for (let i = 0; i < userRanges.length; i++) {
+                let from = userRanges[i-1] ? userRanges[i-1] + 1 : 1;
+                let to = userRanges[i];
+                labels.push('<i style="background:' + palette[i] + '"></i> ' + from + (to ? ' &ndash; ' + to : '+'));
+            }
+            labels.push('<i style="background:' + palette[userRanges.length] + '"></i> ' + (userRanges[userRanges.length-1] + 1) + '+');
+            div.innerHTML = labels.join('<br>');
+            return div;
+        };
+        legendControl.addTo(map);
+    }
+
+    function loadTurkeyGeoJSON() {
+        fetch('https://raw.githubusercontent.com/MEnesSevgi/altlik-harita/main/tr-cities-utf8.json')
+            .then(res => res.json())
+            .then(geojson => {
+                turkeyLayerGroup.clearLayers();
+                L.geoJSON(geojson, {
+                    style: styleFeature,
+                    onEachFeature: (f, l) => {
+                        const name = f.properties.NAME || f.properties.name || "Bilinmiyor";
+                        const val = currentData[normalizeName(name)] || 0;
+                        l.bindPopup(`<b>${name}</b><br>Değer: ${val}`);
+                        const center = l.getBounds().getCenter();
+                        L.marker(center, {
+                            icon: L.divIcon({
+                                className: 'city-label',
+                                html: `<span>${name}</span>`,
+                                iconSize: [60, 20]
+                            }),
+                            interactive: false
+                        }).addTo(turkeyLayerGroup);
+                    }
+                }).addTo(turkeyLayerGroup);
+                updateLegend();
+            });
+    }
+
+    function updateRangesFromUI() {
+        const inputs = document.querySelectorAll('.range-val');
+        userRanges = Array.from(inputs).map(i => parseFloat(i.value)).filter(v => !isNaN(v)).sort((a,b) => a-b);
+    }
+
+    const provinceList = ["Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Amasya", "Ankara", "Antalya", "Artvin", "Aydın", "Balıkesir", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Isparta", "Mersin", "İstanbul", "İzmir", "Kars", "Kastamonu", "Kayseri", "Kırklareli", "Kırşehir", "Kocaeli", "Konya", "Kütahya", "Malatya", "Manisa", "Kahramanmaraş", "Mardin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Şanlıurfa", "Uşak", "Van", "Yozgat", "Zonguldak", "Aksaray", "Bayburt", "Karaman", "Kırıkkale", "Batman", "Şırnak", "Bartın", "Ardahan", "Iğdır", "Yalova", "Karabük", "Kilis", "Osmaniye", "Düzce"];
+
+    function setup() {
+        const container = document.getElementById('provinceInputs');
+        provinceList.sort((a,b) => a.localeCompare('tr')).forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'province-entry';
+            div.innerHTML = `<label>${p}</label><input type="number" id="input-${normalizeName(p)}" name="${p}" value="0">`;
+            container.appendChild(div);
+        });
+
+        Object.keys(PALETTES).forEach(k => {
+            const s = document.createElement('span');
+            s.className = `color-option ${k === selectedPaletteKey ? 'selected' : ''}`;
+            s.style.background = PALETTES[k][4];
+            s.onclick = () => {
+                document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+                s.classList.add('selected');
+                selectedPaletteKey = k;
+                updateChoropleth();
+            };
+            document.getElementById('colorPaletteSelector').appendChild(s);
+        });
+    }
+
+    function updateChoropleth() {
+        updateRangesFromUI();
+        document.querySelectorAll('#provinceInputs input').forEach(i => {
+            currentData[normalizeName(i.name)] = parseFloat(i.value) || 0;
+        });
+        loadTurkeyGeoJSON();
+    }
+
+    document.getElementById('updateButton').onclick = updateChoropleth;
+
+    // Excel ve Paylaşım İşlemleri
+    document.getElementById('downloadTemplate').onclick = () => {
+        const data = provinceList.map(p => ({ "IL_ADI": p, "VERI_DEGERI": 0 }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Veri");
+        XLSX.writeFile(wb, "Harita_Sablon.xlsx");
+    };
+
+    document.getElementById('uploadData').onclick = () => document.getElementById('excelFile').click();
+    document.getElementById('excelFile').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const wb = XLSX.read(new Uint8Array(ev.target.result), {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            json.forEach(row => {
+                const il = row["IL_ADI"] || Object.values(row)[0];
+                const val = row["VERI_DEGERI"] || Object.values(row)[1];
+                const input = document.getElementById(`input-${normalizeName(il)}`);
+                if(input) input.value = val || 0;
+            });
+            updateChoropleth();
+        };
+        reader.readAsArrayBuffer(e.target.files[0]);
+    };
+
+    document.getElementById('shareMap').onclick = () => {
+        updateRangesFromUI();
+        const params = new URLSearchParams();
+        params.set('view', '1');
+        params.set('palette', selectedPaletteKey);
+        params.set('ranges', userRanges.join(','));
+        params.set('data', btoa(unescape(encodeURIComponent(JSON.stringify(currentData)))));
+        navigator.clipboard.writeText(window.location.origin + window.location.pathname + '?' + params.toString());
+        alert("Katmanlar ve aralıklarla birlikte link kopyalandı!");
+    };
+
+    function checkUrlParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('view') === '1') document.body.classList.add('view-mode');
+        if (urlParams.get('palette')) selectedPaletteKey = urlParams.get('palette');
+        if (urlParams.get('ranges')) {
+            userRanges = urlParams.get('ranges').split(',').map(Number);
+            const rangeInputs = document.querySelectorAll('.range-val');
+            userRanges.forEach((rv, i) => { if(rangeInputs[i]) rangeInputs[i].value = rv; });
+        }
+        if (urlParams.get('data')) {
+            try {
+                currentData = JSON.parse(decodeURIComponent(escape(atob(urlParams.get('data')))));
+                setTimeout(() => {
+                    Object.keys(currentData).forEach(key => {
+                        const input = document.getElementById(`input-${key}`);
+                        if(input) input.value = currentData[key];
+                    });
+                    loadTurkeyGeoJSON();
+                }, 800);
+            } catch(e) { console.error(e); }
+        }
+    }
+
+    setup();
+    checkUrlParams();
+    loadTurkeyGeoJSON();
+</script>
+</body>
+</html>
+    
+  </body>
+  
+</html>
