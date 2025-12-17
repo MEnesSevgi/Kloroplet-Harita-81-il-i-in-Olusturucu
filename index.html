@@ -1,15 +1,4 @@
 <!DOCTYPE html>
-<html lang="en">
-
-  <head>
-    <meta charset="UTF-8">
-    <title>Kloroplet Harita(81 il için) Oluşturucu</title>
-    
-
-  </head>
-    
-  <body>
-  <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8" />
@@ -132,7 +121,10 @@
             .replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s")
             .replace(/ı/g, "i").replace(/ö/g, "o").replace(/ç/g, "c")
             .replace(/\s+/g, "");
+      
+   
     }
+  
 
     function getColor(d) {
         const palette = PALETTES[selectedPaletteKey];
@@ -177,6 +169,8 @@
                     style: styleFeature,
                     onEachFeature: (f, l) => {
                         const name = f.properties.NAME || f.properties.name || "Bilinmiyor";
+                       console.log("Haritada gösterilen il:", name); // kontrol için
+                      
                         const val = currentData[normalizeName(name)] || 0;
                         l.bindPopup(`<b>${name}</b><br>Değer: ${val}`);
                         const center = l.getBounds().getCenter();
@@ -299,8 +293,4 @@
     loadTurkeyGeoJSON();
 </script>
 </body>
-</html>
-    
-  </body>
-  
 </html>
