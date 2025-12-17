@@ -41,10 +41,21 @@
 
         /* Lejant Stili */
         .info.legend {
-            padding: 10px; background: white; background: rgba(255,255,255,0.9);
+            padding: 10px; background: rgba(255,255,255,0.9);
             box-shadow: 0 0 15px rgba(0,0,0,0.2); border-radius: 5px; line-height: 24px; color: #555;
         }
         .info.legend i { width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.7; border: 1px solid #999; }
+
+        /* Yeni Açıklama Paneli Stili (Sol Alt) */
+        .info.description {
+            padding: 15px; background: rgba(255,255,255,0.95);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2); border-radius: 8px; 
+            min-width: 200px; color: #333;
+        }
+        .info.description h4 { margin: 0 0 10px 0; border-bottom: 2px solid #6f42c1; padding-bottom: 5px; }
+        .info.description ul { list-style: none; padding: 0; margin: 0; }
+        .info.description li { margin-bottom: 5px; font-size: 0.9em; display: flex; justify-content: space-between; }
+        .info.description b { color: #2171b5; }
     </style>
 </head>
 <body>
@@ -55,17 +66,20 @@
     <h2>📊 Harita Yönetimi</h2>
     
     <div class="control-group">
+        <p>📝 <b>Panel Ayarları</b></p>
+        <label style="font-size: 0.8em;">Açıklama Başlığı:</label>
+        <input type="text" id="panelTitleInput" class="range-val" value="Harita Açıklamaları" style="width:100%; margin-bottom:10px;">
         <button id="shareMap" class="btn btn-share">🔗 Haritayı Paylaş (Görünüm Linki)</button>
     </div>
 
     <div class="control-group">
         <p>🎨 <b>Renk Aralıkları & Palet</b></p>
         <div id="rangeInputs">
-            <div class="range-entry"><input type="number" class="range-val" value="10" placeholder="Sınır 1"></div>
-            <div class="range-entry"><input type="number" class="range-val" value="50" placeholder="Sınır 2"></div>
-            <div class="range-entry"><input type="number" class="range-val" value="100" placeholder="Sınır 3"></div>
-            <div class="range-entry"><input type="number" class="range-val" value="500" placeholder="Sınır 4"></div>
-            <div class="range-entry"><input type="number" class="range-val" value="1000" placeholder="Sınır 5"></div>
+            <div class="range-entry"><input type="number" class="range-val" value="10"></div>
+            <div class="range-entry"><input type="number" class="range-val" value="50"></div>
+            <div class="range-entry"><input type="number" class="range-val" value="100"></div>
+            <div class="range-entry"><input type="number" class="range-val" value="500"></div>
+            <div class="range-entry"><input type="number" class="range-val" value="1000"></div>
         </div>
         <div id="colorPaletteSelector" style="margin-top:10px;"></div>
     </div>
@@ -91,11 +105,71 @@
     let selectedPaletteKey = 'blue';
     let userRanges = [10, 50, 100, 500, 1000];
     let legendControl;
+    let descriptionControl; // Sol alt panel için
 
     const PALETTES = {
         blue: ['#deebf7','#c6dbef','#9ecae1','#6baed6','#4292c6','#2171b5','#084594'],
         red: ['#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#99000d'],
-        green: ['#e5f5e0','#c7e9c0','#a1d99b','#74c476','#41ab5d','#238b45','#005a32']
+        green: ['#e5f5e0','#c7e9c0','#a1d99b','#74c476','#41ab5d','#238b45','#005a32'],
+      purple: ['#f2f0f7','#dadaeb','#bcbddc','#9e9ac8','#807dba','#6a51a3','#4a1486'],
+    orange: ['#fff5eb','#fee6ce','#fdd0a2','#fdae6b','#fd8d3c','#f16913','#8c2d04'],
+    magma:  ['#fcfdbf','#fec287','#fa8270','#cd4071','#8c2981','#51127c','#000004'],
+      
+      // Standart Renkler
+        blue: ['#deebf7','#c6dbef','#9ecae1','#6baed6','#4292c6','#2171b5','#084594'],
+        red: ['#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#99000d'],
+        green: ['#e5f5e0','#c7e9c0','#a1d99b','#74c476','#41ab5d','#238b45','#005a32'],
+        
+        // Ara Tonlar
+        purple: ['#f2f0f7','#dadaeb','#bcbddc','#9e9ac8','#807dba','#6a51a3','#4a1486'],
+        orange: ['#fff5eb','#fee6ce','#fdd0a2','#fdae6b','#fd8d3c','#f16913','#8c2d04'],
+        pink: ['#fde0ef','#f1b6da','#de77ae','#c51b7d','#8e0152','#4d004b','#270026'],
+        
+        // Çok Renkli (Sıcak-Soğuk) Geçişler
+        terrain: ['#ffffd4','#fed98e','#fe9929','#d95f0e','#993404','#632200','#3b1400'],
+        sunset: ['#ffeda0','#fed976','#feb24c','#fd8d3c','#fc4e2a','#e31a1c','#800026'],
+        ocean: ['#e0f3db','#a8ddb5','#7bccc4','#4eb3d3','#2b8cbe','#0868ac','#084081'],
+        
+        // Koyu/Modern Temalar
+        magma: ['#fb8861','#e65d6f','#b6367a','#822681','#541f81','#231151','#000004'],
+        viridis: ['#fde725','#b5de2b','#6ece58','#35b779','#31688e','#443983','#440154'],
+        gray: ['#f7f7f7','#d9d9d9','#bdbdbd','#969696','#737373','#525252','#252525'],
+      
+      // --- KLASİK SIRALI PALETLER ---
+        blue:   ['#deebf7','#c6dbef','#9ecae1','#6baed6','#4292c6','#2171b5','#084594'],
+        red:    ['#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#99000d'],
+        green:  ['#e5f5e0','#c7e9c0','#a1d99b','#74c476','#41ab5d','#238b45','#005a32'],
+        purple: ['#f2f0f7','#dadaeb','#bcbddc','#9e9ac8','#807dba','#6a51a3','#4a1486'],
+        orange: ['#fff5eb','#fee6ce','#fdd0a2','#fdae6b','#fd8d3c','#f16913','#8c2d04'],
+        gray:   ['#f7f7f7','#d9d9d9','#bdbdbd','#969696','#737373','#525252','#252525'],
+
+        // --- MODERN & PARLAK GEÇİŞLER ---
+        sunset:  ['#ffeda0','#fed976','#feb24c','#fd8d3c','#fc4e2a','#e31a1c','#800026'],
+        ocean:   ['#e0f3db','#a8ddb5','#7bccc4','#4eb3d3','#2b8cbe','#0868ac','#084081'],
+        terrain: ['#ffffd4','#fed98e','#fe9929','#d95f0e','#993404','#632200','#3b1400'],
+        forest:  ['#f7fcf5','#e5f5e0','#c7e9c0','#a1d99b','#74c476','#41ab5d','#00441b'],
+        electric:['#fcfdbf','#fdbb2d','#f89b29','#ec6a1a','#cc4c02','#993404','#662506'],
+
+        // --- BİLİMSEL VERİ PALETLERİ (PERCEPTUALLY UNIFORM) ---
+        viridis: ['#fde725','#b5de2b','#6ece58','#35b779','#31688e','#443983','#440154'],
+        magma:   ['#fb8861','#e65d6f','#b6367a','#822681','#541f81','#231151','#000004'],
+        inferno: ['#fcffa4','#fac228','#f57d15','#d44842','#9f2a63','#65156e','#000004'],
+        plasma:  ['#eff821','#f89441','#d44b73','#9b179e','#5d08a8','#0d0887','#000004'],
+
+        // --- ÇİFT YÖNLÜ (ZIT) PALETLER ---
+        // (Düşük ve yüksek değerleri zıt renklerle vurgulamak için harikadır)
+        spectral:['#d53e4f','#fc8d59','#fee08b','#ffffbf','#e6f598','#99d594','#3288bd'],
+        red_blue:['#b2182b','#ef8a62','#fddbc7','#f7f7f7','#d1e5f0','#67a9cf','#2166ac'],
+        brown_teal:['#8c510a','#d8b365','#f6e8c3','#f5f5f5','#c7eae5','#5ab4ac','#01665e'],
+        pink_green:['#8e0152','#c51b7d','#de77ae','#f1b6da','#e6f5d0','#a1d99b','#4d9221'],
+        
+        // --- ÖZEL KOMBİNASYON ---
+        vintage: ['#eae2d6','#d5c3aa','#b99976','#906d48','#634b35','#423122','#2b1d12'],
+      
+      
+      
+      
+      
     };
 
     // Katmanlar
@@ -121,10 +195,7 @@
             .replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s")
             .replace(/ı/g, "i").replace(/ö/g, "o").replace(/ç/g, "c")
             .replace(/\s+/g, "");
-      
-   
     }
-  
 
     function getColor(d) {
         const palette = PALETTES[selectedPaletteKey];
@@ -135,10 +206,33 @@
         return palette[palette.length - 1];
     }
 
-    function styleFeature(feature) {
-        const name = feature.properties.NAME || feature.properties.name || "";
-        const val = currentData[normalizeName(name)] || 0;
-        return { fillColor: getColor(val), weight: 1.5, opacity: 1, color: '#666', fillOpacity: 0.8 };
+    // --- YENİ: Harita Açıklamaları Paneli (Sol Alt) ---
+    function updateDescriptionPanel() {
+        if (descriptionControl) map.removeControl(descriptionControl);
+        
+        descriptionControl = L.control({ position: 'bottomleft' });
+        descriptionControl.onAdd = function() {
+            const div = L.DomUtil.create('div', 'info description');
+            const title = document.getElementById('panelTitleInput').value || "Harita Açıklamaları";
+            
+            // Verileri büyüklüğe göre sırala ve ilk 5'i al
+            const sortedEntries = Object.entries(currentData)
+                .filter(entry => entry[1] > 0)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+
+            let listItems = sortedEntries.map((entry, index) => {
+                // Görsel isim düzeltme (ilk harf büyük)
+                const name = entry[0].charAt(0).toUpperCase() + entry[0].slice(1);
+                return `<li><span>${index + 1}. ${name}</span> <b>${entry[1]}</b></li>`;
+            }).join('');
+
+            if (sortedEntries.length === 0) listItems = "<li>Veri girilmedi</li>";
+
+            div.innerHTML = `<h4>${title}</h4><ul>${listItems}</ul>`;
+            return div;
+        };
+        descriptionControl.addTo(map);
     }
 
     function updateLegend() {
@@ -166,11 +260,13 @@
             .then(geojson => {
                 turkeyLayerGroup.clearLayers();
                 L.geoJSON(geojson, {
-                    style: styleFeature,
+                    style: (feature) => {
+                        const name = feature.properties.NAME || feature.properties.name || "";
+                        const val = currentData[normalizeName(name)] || 0;
+                        return { fillColor: getColor(val), weight: 1.5, opacity: 1, color: '#666', fillOpacity: 0.8 };
+                    },
                     onEachFeature: (f, l) => {
                         const name = f.properties.NAME || f.properties.name || "Bilinmiyor";
-                       console.log("Haritada gösterilen il:", name); // kontrol için
-                      
                         const val = currentData[normalizeName(name)] || 0;
                         l.bindPopup(`<b>${name}</b><br>Değer: ${val}`);
                         const center = l.getBounds().getCenter();
@@ -185,11 +281,12 @@
                     }
                 }).addTo(turkeyLayerGroup);
                 updateLegend();
+                updateDescriptionPanel(); // Panel güncellenir
             });
     }
 
     function updateRangesFromUI() {
-        const inputs = document.querySelectorAll('.range-val');
+        const inputs = document.querySelectorAll('.range-val:not(#panelTitleInput)');
         userRanges = Array.from(inputs).map(i => parseFloat(i.value)).filter(v => !isNaN(v)).sort((a,b) => a-b);
     }
 
@@ -228,7 +325,7 @@
 
     document.getElementById('updateButton').onclick = updateChoropleth;
 
-    // Excel ve Paylaşım İşlemleri
+    // Excel işlemleri
     document.getElementById('downloadTemplate').onclick = () => {
         const data = provinceList.map(p => ({ "IL_ADI": p, "VERI_DEGERI": 0 }));
         const ws = XLSX.utils.json_to_sheet(data);
@@ -260,18 +357,20 @@
         params.set('view', '1');
         params.set('palette', selectedPaletteKey);
         params.set('ranges', userRanges.join(','));
+        params.set('title', document.getElementById('panelTitleInput').value);
         params.set('data', btoa(unescape(encodeURIComponent(JSON.stringify(currentData)))));
         navigator.clipboard.writeText(window.location.origin + window.location.pathname + '?' + params.toString());
-        alert("Katmanlar ve aralıklarla birlikte link kopyalandı!");
+        alert("Bağlantı kopyalandı! (Panel başlığı dahil edildi)");
     };
 
     function checkUrlParams() {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('view') === '1') document.body.classList.add('view-mode');
+        if (urlParams.get('title')) document.getElementById('panelTitleInput').value = urlParams.get('title');
         if (urlParams.get('palette')) selectedPaletteKey = urlParams.get('palette');
         if (urlParams.get('ranges')) {
             userRanges = urlParams.get('ranges').split(',').map(Number);
-            const rangeInputs = document.querySelectorAll('.range-val');
+            const rangeInputs = document.querySelectorAll('.range-val:not(#panelTitleInput)');
             userRanges.forEach((rv, i) => { if(rangeInputs[i]) rangeInputs[i].value = rv; });
         }
         if (urlParams.get('data')) {
